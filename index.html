@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Joel Kotturi | Business Analytics Portfolio</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+</head>
+<body>
+
+<div class="scroll-progress" id="scroll-progress"></div>
+
+<header class="hero">
+  <div class="hero-bg"></div>
+  <div class="aurora a1"></div>
+  <div class="aurora a2"></div>
+  <div class="aurora a3"></div>
+  <div class="hero-content">
+    <div class="hero-photo-wrap reveal-in">
+      <img class="hero-photo" src="assets/joel-photo.jpg" alt="Joel Kotturi">
+    </div>
+    <div class="eyebrow reveal-in">Business Analytics Portfolio</div>
+    <h1 class="reveal-in">Joel Kotturi</h1>
+    <p class="reveal-in">Advanced analytics projects in optimization, causal inference, forecasting and statistics, built on real data and solved properly, not approximated.</p>
+  </div>
+  <div class="scroll-cue"></div>
+</header>
+
+<section class="bio" id="bio">
+  <div class="bio-inner">
+    <div class="bio-role" id="bio-role"></div>
+    <div class="bio-text" id="bio-text"></div>
+    <div class="skill-picker" id="skill-picker">
+      <button type="button" class="skill-picker-toggle" id="skill-picker-toggle" aria-haspopup="listbox" aria-expanded="false">
+        <span id="skill-picker-label">Select a skill to see where it's used</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <ul class="skill-picker-menu" id="skill-picker-menu" role="listbox"></ul>
+    </div>
+
+    <div class="skill-results" id="skill-results" hidden>
+      <div class="skill-results-head">
+        <div class="skill-results-title">Where <strong id="skill-results-skill"></strong> shows up</div>
+        <button type="button" class="skill-clear" id="skill-clear">Clear &times;</button>
+      </div>
+      <div class="skill-tabs" id="skill-tabs">
+        <button type="button" class="skill-tab active" data-tab="projects">Projects<span class="skill-tab-count" id="tab-count-projects"></span></button>
+        <button type="button" class="skill-tab" data-tab="experience">Experience<span class="skill-tab-count" id="tab-count-experience"></span></button>
+      </div>
+      <div class="skill-tab-panel" id="skill-tab-projects"></div>
+      <div class="skill-tab-panel" id="skill-tab-experience" hidden></div>
+    </div>
+
+    <div class="section-tabs" id="section-tabs">
+      <button type="button" class="section-tab" data-target="project-grid">Projects</button>
+      <button type="button" class="section-tab" data-target="experience">Experience</button>
+    </div>
+
+    <a class="bio-rec-btn" href="#recommendations">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 17.3l-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z"/></svg>
+      View recommendations
+    </a>
+  </div>
+</section>
+
+<div class="stats-strip" id="stats-strip"></div>
+
+<main>
+  <div class="grid" id="project-grid"></div>
+
+  <section class="about">
+    <h2>About this portfolio</h2>
+    <p>Each project here is solved end-to-end with real, cited public data: a written case study, a runnable notebook, and where relevant an interactive dashboard. New projects get added over time, so check back for updates.</p>
+  </section>
+</main>
+
+<section class="experience" id="experience">
+  <h2>Experience</h2>
+  <div class="grid" id="experience-grid"></div>
+</section>
+
+<section class="recommendations" id="recommendations">
+  <h2>Recommendations</h2>
+  <p class="recommendations-sub">What people I've worked with have said, in their own words.</p>
+  <div class="rec-grid" id="rec-grid"></div>
+</section>
+
+<footer>
+  Built with Python, real government open data, and a genuine curiosity for how the numbers actually work.
+</footer>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-panel" id="modal-panel" role="dialog" aria-modal="true">
+    <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+<script src="js/projects.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
