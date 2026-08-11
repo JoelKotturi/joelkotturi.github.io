@@ -38,7 +38,7 @@ const projects = [
     metrics: [
       { value: 76, label: "Communities modeled" },
       { value: 100, label: "% coverage achieved" },
-      { value: 16, label: "Sites recommended" }
+      { value: 7, label: "Sites recommended" }
     ],
 
     // Which skill chips (from the bio section below) this project actually
@@ -57,7 +57,7 @@ const projects = [
         "GeoPandas · Folium"
       ],
 
-      methodSummary: "Every WA SA2 (267 total) was cleaned down to 76 real regional communities: national parks, airports and industrial precincts with no population were excluded, and scope was restricted to areas outside Greater Perth, matching the CRC network's actual mandate. Population, SEIFA disadvantage, and Census volunteering rate combine into an equity-weighted demand score for each community. Distances (great-circle distance multiplied by a 1.3 road-circuity factor) connect every community to its nearest facility. The core model is a Maximal Covering Location Problem, a Mixed-Integer Program solved to full, provable optimality with the open-source CBC solver via PuLP, choosing which new sites to fund, alongside the 103 already-open CRCs, to maximize equity-weighted coverage within a 50km service radius. A real empirical check (correlation of -0.45 between distance to nearest CRC and volunteer rate) validated the gravity-model distance-decay logic against actual data before relying on it.",
+      methodSummary: "Every WA SA2 (267 total) was cleaned down to 76 real regional communities: national parks, airports and industrial precincts with no population were excluded, and scope was restricted to areas outside Greater Perth, matching the CRC network's actual mandate. Population, SEIFA disadvantage, and Census volunteering rate combine into an equity-weighted demand score for each community. Distances (great-circle distance multiplied by a 1.3 road-circuity factor) connect every community to its nearest facility. The core model is a Maximal Covering Location Problem, a Mixed-Integer Program solved to full, provable optimality with the open-source CBC solver via PuLP, choosing which new sites to fund, alongside the 103 already-open CRCs, to maximize equity-weighted coverage within a 50km service radius. A real empirical check (correlation of -0.19 between distance to nearest CRC and volunteer rate, after a location-data fix described below) validated the gravity-model distance-decay logic against actual data before relying on it, honestly: it is a weak relationship, not a strong one, and this write-up says so rather than rounding it up.",
 
       // Real, working code pulled straight from the project notebook, trimmed
       // to the parts that matter and numbered so it reads as a story instead
@@ -105,22 +105,22 @@ seifa['SA2_CODE_2021'] = seifa['SA2_CODE_2021'].astype(int).astype(str)
 seifa_wa = seifa[seifa['state'] == 'WA'][['SA2_CODE_2021', 'irsd_score', 'irsd_decile_aus']]`
         },
         {
-          title: "Correct a real location error",
-          note: "A community's plain geometric centroid can sit a long way from where people actually live. Every SA2 whose name matches a real Community Resource Centre town gets snapped to that town's true coordinates instead.",
-          code: `# Add the Greater Perth / Rest of WA classification from the boundary file
-gcc_lookup = sa2_all[sa2_all['STE_CODE21'] == '5'][['SA2_CODE21', 'GCC_NAME21']].rename(
-    columns={'SA2_CODE21': 'SA2_CODE_2021'})
-demand_points = demand_points.merge(gcc_lookup, on='SA2_CODE_2021', how='left')
-
-# Snap centroids to the real CRC town wherever the SA2 name matches a CRC exactly
+          title: "Correct a real location error, in two passes",
+          note: "A community's plain geometric centroid can sit a long way from where people actually live. Pass one snaps any SA2 whose name exactly matches a real Community Resource Centre town to that town's true coordinates. Pass one misses SA2s like 'Leinster - Leonora', whose name doesn't exactly equal the real 'Leonora' CRC sitting inside it, so pass two finds every real CRC that geographically falls inside a large SA2's own boundary and snaps to that instead. This second pass was added after a reviewer asked how well the geometric centroid actually represented a huge SA2 like East Pilbara, and it turned out the answer was: not well at all, 492km off.",
+          code: `# Pass 1: snap centroids to the real CRC town wherever the SA2 name matches a CRC exactly
 demand_points['name_key'] = demand_points['SA2_NAME'].str.replace(' (WA)', '', regex=False).str.strip().str.lower()
 crc['name_key'] = crc['crc_name'].str.strip().str.lower()
 crc_lookup = crc.set_index('name_key')[['lat', 'lon']].rename(columns={'lat': 'crc_lat', 'lon': 'crc_lon'})
 demand_points = demand_points.merge(crc_lookup, on='name_key', how='left')
-n_fixed = demand_points['crc_lat'].notna().sum()
-demand_points['lat'] = demand_points['crc_lat'].fillna(demand_points['lat'])
-demand_points['lon'] = demand_points['crc_lon'].fillna(demand_points['lon'])
-demand_points = demand_points.drop(columns=['crc_lat', 'crc_lon', 'name_key'])`
+demand_points['correction_method'] = np.where(demand_points['crc_lat'].notna(), 'exact_name_match', 'none')
+
+# Pass 2: for large SA2s (>5,000 sq km) pass 1 missed, snap to a real CRC that
+# geographically sits inside that SA2's own boundary, preferring one whose name
+# is part of the SA2's own name, falling back to the nearest one otherwise.
+for _, row in large_uncorrected.iterrows():
+    inside = gpd.sjoin(crc_gdf, sa2_boundary(row['SA2_CODE_2021']), predicate='within')
+    best = pick_by_name_then_nearest(inside, row)
+    demand_points.loc[row.name, ['lat', 'lon']] = [best['lat'], best['lon']]`
         },
         {
           title: "Calculate distance and validate the model's core assumption",
@@ -177,17 +177,17 @@ for p in range(0, 26):
       legend: [
         { color: "#1baf7a", label: "Already covered" },
         { color: "#2a78d6", label: "Phase 1 recommended (5 sites)" },
-        { color: "#eb6834", label: "Full-rollout recommended (11 more)" },
+        { color: "#eb6834", label: "Full-rollout recommended (2 more)" },
         { color: "#383835", label: "Existing CRC", square: true }
       ],
 
       chartImage: "assets/budget_sensitivity_chart.png",
-      chartCaption: "Five facilities capture most of the gap (58.9% to 87.3% coverage); sixteen close it completely. Every site beyond that adds zero further benefit under this model, a genuinely useful signal for a funding decision.",
+      chartCaption: "Five facilities capture most of the gap (69.9% to 98.3% coverage); two more close it completely. Every site beyond that adds zero further benefit under this model, a genuinely useful signal for a funding decision. (A location-data fix, walked through above, corrected the baseline from an earlier, understated 58.9%.)",
 
       siteTables: [
         {
           badge: "Phase 1 · Quick wins",
-          heading: "5 new facilities, 87.3% coverage",
+          heading: "5 new facilities, 98.3% coverage",
           rows: [
             ["Geraldton", "11,888", "81"],
             ["Esperance", "12,003", "209"],
@@ -197,20 +197,11 @@ for p in range(0, 26):
           ]
         },
         {
-          badge: "Full rollout · Remaining 11",
-          heading: "16 facilities total, 100% coverage",
+          badge: "Full rollout · Remaining 2",
+          heading: "7 facilities total, 100% coverage",
           rows: [
-            ["Derby - West Kimberley", "7,045", "108"],
-            ["East Pilbara", "5,910", "492"],
-            ["Kununurra", "7,477", "153"],
-            ["Ashburton (WA)", "7,391", "145"],
-            ["Leinster - Leonora", "4,804", "360"],
-            ["Kambalda - Coolgardie - Norseman", "4,389", "322"],
             ["Carnarvon", "4,879", "156"],
-            ["Northampton - Mullewa - Greenough", "5,679", "85"],
-            ["Newman", "4,239", "277"],
-            ["Roebuck", "2,310", "96"],
-            ["Esperance Surrounds", "3,966", "161"]
+            ["Newman", "4,239", "277"]
           ]
         }
       ],
