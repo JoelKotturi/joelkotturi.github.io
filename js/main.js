@@ -257,6 +257,20 @@ function expImagesHTML(images) {
   `).join('')}</div>`;
 }
 
+// Same idea as expImagesHTML, but always one image below another rather than
+// a grid, and shown larger. Used wherever images have different aspect
+// ratios (so a grid would squash them oddly) or should just read big and
+// clear, one at a time: dashboard before/after shots, proof-of-work photos.
+function stackedImagesHTML(images) {
+  if (!images || !images.length) return '';
+  return `<div class="stack-shot-grid">${images.map(img => `
+    <figure class="stack-shot">
+      <img src="${img.src}" alt="${img.caption || ''}" loading="lazy">
+      ${img.caption ? `<figcaption>${img.caption}</figcaption>` : ''}
+    </figure>
+  `).join('')}</div>`;
+}
+
 function experienceModalHTML() {
   const storySections = experience.story.map(s => `
     <section class="modal-section exp-story-section">
@@ -451,7 +465,7 @@ function liveModalHTML(p) {
     const dashboardBlock = (d.dashboardShots && d.dashboardShots.length) ? `
       <div class="outcome-block">
         <h4>${d.dashboardHeading || 'Dashboard'}</h4>
-        ${expImagesHTML(d.dashboardShots)}
+        ${stackedImagesHTML(d.dashboardShots)}
         ${d.dashboardCaption ? `<p class="modal-caption">${d.dashboardCaption}</p>` : ''}
       </div>
     ` : '';
@@ -467,7 +481,7 @@ function liveModalHTML(p) {
 
   // --- Methodology (tools/techniques used, then the real code, then any
   // proof-of-work screenshots such as SQL or a dashboard editor) ------
-  if ((d.tags && d.tags.length) || (d.codeWalkthrough && d.codeWalkthrough.length) || (d.proofOfWork && d.proofOfWork.images && d.proofOfWork.images.length)) {
+  if ((d.tags && d.tags.length) || (d.codeWalkthrough && d.codeWalkthrough.length) || (d.proofOfWork && d.proofOfWork.steps && d.proofOfWork.steps.length)) {
     const chips = (d.tags && d.tags.length)
       ? `<div class="modal-chips">${d.tags.map(t => `<span class="chip">${t}</span>`).join('')}</div>`
       : '';
@@ -483,11 +497,22 @@ function liveModalHTML(p) {
           </div>
         `).join('')
       : '';
-    const proof = (d.proofOfWork && d.proofOfWork.images && d.proofOfWork.images.length) ? `
+    // Proof-of-work: each step pairs a screenshot of the actual code (SQL,
+    // a query tool, etc.) with the result it produced, one below the other,
+    // so it reads as "code, then what it produced" rather than a loose grid.
+    const proof = (d.proofOfWork && d.proofOfWork.steps && d.proofOfWork.steps.length) ? `
       <div class="code-step">
         <div class="code-step-head"><h4>${d.proofOfWork.heading || 'Proof of Work'}</h4></div>
         ${d.proofOfWork.intro ? `<p class="code-step-note">${d.proofOfWork.intro}</p>` : ''}
-        ${expImagesHTML(d.proofOfWork.images)}
+        <div class="proof-steps">
+          ${d.proofOfWork.steps.map(s => `
+            <div class="proof-step">
+              ${s.title ? `<div class="proof-step-title">${s.title}</div>` : ''}
+              ${s.note ? `<p class="proof-step-note">${s.note}</p>` : ''}
+              ${stackedImagesHTML([s.code, s.result].filter(Boolean))}
+            </div>
+          `).join('')}
+        </div>
       </div>
     ` : '';
     parts.push(`

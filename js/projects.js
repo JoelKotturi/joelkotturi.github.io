@@ -248,12 +248,20 @@ for p in range(0, 26):
 
       proofOfWork: {
         heading: "Proof of Work",
-        intro: "The data layer behind the dashboard, straight from the query tool: real SQL that rolls two years of raw transactions into per-household summaries and an isolated, non-overlapping Campaign 18 test group.",
-        images: [
-          { src: "assets/clv_sql_customer_views.png", caption: "PostgreSQL views rolling up raw transaction and basket data into one row per household: order count, total and average spend." },
-          { src: "assets/clv_sql_customer_output.png", caption: "Output of the household summary view, joined against demographics for downstream modeling." },
-          { src: "assets/clv_sql_campaign_views.png", caption: "The views behind the causal test: tagging who did and didn't receive Campaign 18, then summing spend into a pre- and post-period window per household." },
-          { src: "assets/clv_sql_campaign_output.png", caption: "Household-level pre/post spend, treated vs. control, the exact table the Difference-in-Differences test runs on." }
+        intro: "The data layer behind the dashboard, straight from the query tool: real SQL that rolls two years of raw transactions into per-household summaries and an isolated, non-overlapping Campaign 18 test group. Each step below shows the actual SQL, then the result it produced.",
+        steps: [
+          {
+            title: "Step 1: household summary view",
+            note: "Two PostgreSQL views rolling up raw transaction and basket data into one row per household: order count, total and average spend, joined against demographics.",
+            code: { src: "assets/clv_sql_customer_views.png", caption: "The SQL: v_customer_orders rolls up baskets, v_customer_summary rolls that up again per household and joins demographics." },
+            result: { src: "assets/clv_sql_customer_output.png", caption: "The result: one row per household, ready for the CLV model." }
+          },
+          {
+            title: "Step 2: Campaign 18 causal test group",
+            note: "The views behind the causal test: tagging who did and didn't receive Campaign 18, then summing each household's spend into a pre- and post-period window.",
+            code: { src: "assets/clv_sql_campaign_views.png", caption: "The SQL: v_campaign18_groups tags treated vs. control households, v_campaign18_did sums their spend either side of the campaign." },
+            result: { src: "assets/clv_sql_campaign_output.png", caption: "The result: household-level pre/post spend, treated vs. control, the exact table the Difference-in-Differences test runs on." }
+          }
         ]
       },
 
