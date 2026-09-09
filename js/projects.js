@@ -182,6 +182,7 @@ for p in range(0, 26):
       ],
 
       chartImage: "assets/budget_sensitivity_chart.png",
+      chartHeading: "Budget vs. coverage trade-off",
       chartCaption: "Five facilities capture most of the gap (69.9% to 98.3% coverage); two more close it completely. Every site beyond that adds zero further benefit under this model, a genuinely useful signal for a funding decision. (A location-data fix, walked through above, corrected the baseline from an earlier, understated 58.9%.)",
 
       siteTables: [
@@ -280,13 +281,13 @@ for p in range(0, 26):
           headers: ["Version of the test", "Households", "Effect / household", "Verdict"],
           rows: [
             ["Before cleanup (quick check)", "1,133", "+$17.52 (p = 0.017)", "Looks significant, but contaminated"],
-            ["After cleanup (Campaign 18 only)", "165", "−$1.87 (p = 0.896)", "Not significant — the honest result"]
+            ["After cleanup (Campaign 18 only)", "165", "−$1.87 (p = 0.896)", "Not significant, the honest result"]
           ]
         }
       ],
 
       dataSources: [
-        "dunnhumby “The Complete Journey” — 2 years of real household transaction, campaign and demographic data (2,500 households)",
+        "dunnhumby “The Complete Journey”: 2 years of real household transaction, campaign and demographic data (2,500 households)",
         "PostgreSQL data warehouse built directly from the raw dunnhumby CSV extracts",
         "Power BI dashboard reading from the same household-level summary tables shown above"
       ],

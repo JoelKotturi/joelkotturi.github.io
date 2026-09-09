@@ -382,10 +382,12 @@ function soonModalHTML(p) {
   `;
 }
 
-// Every "live" project popup follows the same five-part business-analyst
-// narrative, in this order: The Problem -> Our Approach -> Methodology ->
-// Outcome -> Recommendation, with data sources and downloads as reference
-// material at the end. Each section only renders if that project actually
+// Every "live" project popup follows the same order: The Problem -> Data &
+// Resources (the downloads, up top so they're easy to find) -> Our Approach
+// -> Outcome (the graphs/charts first, then the interactive map, since the
+// visual result is what a reader wants before the technical detail) ->
+// Methodology (the tools used, then the real code / proof-of-work screenshots)
+// -> Recommendation. Each section only renders if that project actually
 // supplied the matching `detail` field, so a project can fill in as much
 // or as little as it has ready without leaving empty headers behind.
 function liveModalHTML(p) {
@@ -403,13 +405,69 @@ function liveModalHTML(p) {
     ).join('')}</div>`);
   }
 
+  // --- Data & resources (kept up top: what to read or download, before
+  // the narrative, so it's not buried under everything else) ---------
+  const downloads = [];
+  if (d.caseStudyHref) downloads.push(`<a class="dl-primary" href="${d.caseStudyHref}" download>${DOWNLOAD_ICON} Download Case Study (.docx)</a>`);
+  if (d.notebookHref) downloads.push(`<a class="dl-secondary" href="${d.notebookHref}" download>${DOWNLOAD_ICON} Notebook (.ipynb)</a>`);
+  if (d.mapHref) downloads.push(`<a class="dl-secondary" href="${d.mapHref}" target="_blank" rel="noopener">Open Map Full Screen &#8599;</a>`);
+  // Any other downloadable package a project wants to offer (e.g. a Power BI
+  // .pbix file bundled with its source data). Each entry: { href, label }.
+  (d.extraDownloads || []).forEach(x => {
+    downloads.push(`<a class="dl-secondary" href="${x.href}" download>${DOWNLOAD_ICON} ${x.label}</a>`);
+  });
+
+  if (downloads.length || (d.dataSources && d.dataSources.length)) {
+    parts.push(`
+      <section class="modal-section">
+        <h3>Data &amp; Resources</h3>
+        ${downloads.length ? `<div class="modal-downloads">${downloads.join('')}</div>` : ''}
+        ${(d.dataSources && d.dataSources.length) ? `<ul class="modal-sources">${d.dataSources.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
+      </section>
+    `);
+  }
+
   // --- Our approach --------------------------------------------------
   if (d.methodSummary) {
     parts.push(`<section class="modal-section"><h3>Our Approach</h3><p>${d.methodSummary}</p></section>`);
   }
 
-  // --- Methodology (tools/techniques used, then the real code) -------
-  if ((d.tags && d.tags.length) || (d.codeWalkthrough && d.codeWalkthrough.length)) {
+  // --- Outcome: the visual result first (charts / dashboard screenshots),
+  // then the interactive map, ahead of any code -----------------------
+  if (d.chartImage || (d.dashboardShots && d.dashboardShots.length) || d.mapHref) {
+    const legend = (d.legend || []).map(l =>
+      `<span><span class="dot" style="background:${l.color};${l.square ? 'border-radius:2px;' : ''}"></span>${l.label}</span>`
+    ).join('');
+    const chartBlock = d.chartImage ? `
+      <div class="outcome-block">
+        <h4>${d.chartHeading || 'Chart'}</h4>
+        <img class="modal-chart" src="${d.chartImage}" alt="${d.chartHeading || 'Chart'}">
+        ${d.chartCaption ? `<p class="modal-caption">${d.chartCaption}</p>` : ''}
+      </div>
+    ` : '';
+    // A project without a live embedded dashboard (e.g. Power BI, which has
+    // no free public embed link) can instead show real screenshots of the
+    // dashboard here, same idea as the interactive map below.
+    const dashboardBlock = (d.dashboardShots && d.dashboardShots.length) ? `
+      <div class="outcome-block">
+        <h4>${d.dashboardHeading || 'Dashboard'}</h4>
+        ${expImagesHTML(d.dashboardShots)}
+        ${d.dashboardCaption ? `<p class="modal-caption">${d.dashboardCaption}</p>` : ''}
+      </div>
+    ` : '';
+    const mapBlock = d.mapHref ? `
+      <div class="outcome-block">
+        <h4>Interactive map</h4>
+        <iframe class="modal-map" src="${d.mapHref}" loading="lazy"></iframe>
+        ${legend ? `<div class="modal-legend">${legend}</div>` : ''}
+      </div>
+    ` : '';
+    parts.push(`<section class="modal-section"><h3>Outcome</h3>${chartBlock}${dashboardBlock}${mapBlock}</section>`);
+  }
+
+  // --- Methodology (tools/techniques used, then the real code, then any
+  // proof-of-work screenshots such as SQL or a dashboard editor) ------
+  if ((d.tags && d.tags.length) || (d.codeWalkthrough && d.codeWalkthrough.length) || (d.proofOfWork && d.proofOfWork.images && d.proofOfWork.images.length)) {
     const chips = (d.tags && d.tags.length)
       ? `<div class="modal-chips">${d.tags.map(t => `<span class="chip">${t}</span>`).join('')}</div>`
       : '';
@@ -425,6 +483,13 @@ function liveModalHTML(p) {
           </div>
         `).join('')
       : '';
+    const proof = (d.proofOfWork && d.proofOfWork.images && d.proofOfWork.images.length) ? `
+      <div class="code-step">
+        <div class="code-step-head"><h4>${d.proofOfWork.heading || 'Proof of Work'}</h4></div>
+        ${d.proofOfWork.intro ? `<p class="code-step-note">${d.proofOfWork.intro}</p>` : ''}
+        ${expImagesHTML(d.proofOfWork.images)}
+      </div>
+    ` : '';
     parts.push(`
       <section class="modal-section">
         <h3>Methodology</h3>
@@ -433,52 +498,9 @@ function liveModalHTML(p) {
           <p class="modal-caption">Real code from the project notebook, the actual steps that produced the result below, not a summary of it.</p>
           <div class="code-walkthrough">${steps}</div>
         ` : ''}
+        ${proof ? `<div class="code-walkthrough" style="margin-top:${steps ? '22px' : '0'};">${proof}</div>` : ''}
       </section>
     `);
-  }
-
-  // --- Proof of work (real screenshots pulled straight from the build:
-  // SQL, dashboard editors, notebooks, whatever the project actually used) ---
-  if (d.proofOfWork && d.proofOfWork.images && d.proofOfWork.images.length) {
-    parts.push(`
-      <section class="modal-section">
-        <h3>${d.proofOfWork.heading || 'Proof of Work'}</h3>
-        ${d.proofOfWork.intro ? `<p class="modal-caption" style="text-align:left;margin-top:0;">${d.proofOfWork.intro}</p>` : ''}
-        ${expImagesHTML(d.proofOfWork.images)}
-      </section>
-    `);
-  }
-
-  // --- Outcome (the visual result of the methodology above) ----------
-  if (d.mapHref || d.chartImage || (d.dashboardShots && d.dashboardShots.length)) {
-    const legend = (d.legend || []).map(l =>
-      `<span><span class="dot" style="background:${l.color};${l.square ? 'border-radius:2px;' : ''}"></span>${l.label}</span>`
-    ).join('');
-    const mapBlock = d.mapHref ? `
-      <div class="outcome-block">
-        <h4>Interactive map</h4>
-        <iframe class="modal-map" src="${d.mapHref}" loading="lazy"></iframe>
-        ${legend ? `<div class="modal-legend">${legend}</div>` : ''}
-      </div>
-    ` : '';
-    const chartBlock = d.chartImage ? `
-      <div class="outcome-block">
-        <h4>Budget vs. coverage trade-off</h4>
-        <img class="modal-chart" src="${d.chartImage}" alt="Budget sensitivity chart">
-        ${d.chartCaption ? `<p class="modal-caption">${d.chartCaption}</p>` : ''}
-      </div>
-    ` : '';
-    // A project without a live embedded dashboard (e.g. Power BI, which has
-    // no free public embed link) can instead show real screenshots of the
-    // dashboard here, same idea as the interactive map above.
-    const dashboardBlock = (d.dashboardShots && d.dashboardShots.length) ? `
-      <div class="outcome-block">
-        <h4>${d.dashboardHeading || 'Dashboard'}</h4>
-        ${expImagesHTML(d.dashboardShots)}
-        ${d.dashboardCaption ? `<p class="modal-caption">${d.dashboardCaption}</p>` : ''}
-      </div>
-    ` : '';
-    parts.push(`<section class="modal-section"><h3>Outcome</h3>${mapBlock}${chartBlock}${dashboardBlock}</section>`);
   }
 
   // --- Recommendation --------------------------------------------------
@@ -498,28 +520,6 @@ function liveModalHTML(p) {
     `;
     }).join('');
     parts.push(`<section class="modal-section"><h3>Recommendation</h3><div class="modal-tables">${blocks}</div></section>`);
-  }
-
-  // --- Data & resources (reference material, kept out of the way at
-  // the top so the narrative reads cleanly first) ---------------------
-  const downloads = [];
-  if (d.caseStudyHref) downloads.push(`<a class="dl-primary" href="${d.caseStudyHref}" download>${DOWNLOAD_ICON} Download Case Study (.docx)</a>`);
-  if (d.notebookHref) downloads.push(`<a class="dl-secondary" href="${d.notebookHref}" download>${DOWNLOAD_ICON} Notebook (.ipynb)</a>`);
-  if (d.mapHref) downloads.push(`<a class="dl-secondary" href="${d.mapHref}" target="_blank" rel="noopener">Open Map Full Screen &#8599;</a>`);
-  // Any other downloadable package a project wants to offer (e.g. a Power BI
-  // .pbix file bundled with its source data). Each entry: { href, label }.
-  (d.extraDownloads || []).forEach(x => {
-    downloads.push(`<a class="dl-secondary" href="${x.href}" download>${DOWNLOAD_ICON} ${x.label}</a>`);
-  });
-
-  if (downloads.length || (d.dataSources && d.dataSources.length)) {
-    parts.push(`
-      <section class="modal-section">
-        <h3>Data &amp; Resources</h3>
-        ${downloads.length ? `<div class="modal-downloads">${downloads.join('')}</div>` : ''}
-        ${(d.dataSources && d.dataSources.length) ? `<ul class="modal-sources">${d.dataSources.map(s => `<li>${s}</li>`).join('')}</ul>` : ''}
-      </section>
-    `);
   }
 
   return parts.join('');
