@@ -221,10 +221,81 @@ for p in range(0, 26):
   {
     title: "Customer Lifetime Value & Campaign Impact",
     tag: "Marketing & Customer Analytics",
-    description: "Which customers are worth the most over time, and did a specific campaign actually cause a sales lift: probabilistic CLV modeling plus a causal Difference-in-Differences design.",
-    image: "",
-    icon: "chart",
-    status: "soon"
+    description: "Which customers are worth the most over time, and did a specific campaign actually cause a sales lift: probabilistic CLV modeling plus a causal Difference-in-Differences design, built on two years of real household transaction data.",
+    image: "assets/project2-cover.png",
+    status: "live",
+
+    metrics: [
+      { value: 2500, label: "Households analyzed" },
+      { value: 54, label: "% of CLV from top 20% of customers" },
+      { value: 165, label: "Clean, non-overlapping test group" }
+    ],
+
+    skills: ["Python", "SQL", "Power BI", "Data Analysis", "Statistics", "Data Modeling"],
+
+    detail: {
+      tags: [
+        "BG/NBD Model (purchase frequency)",
+        "Gamma-Gamma Model (monetary value)",
+        "Probabilistic Customer Lifetime Value",
+        "Difference-in-Differences",
+        "SQL · PostgreSQL",
+        "Power BI"
+      ],
+
+      methodSummary: "Two years of real household transaction, demographic and campaign data from dunnhumby's “The Complete Journey” panel (2,500 households) were loaded into a PostgreSQL warehouse and rolled up, through a set of SQL views, into one row per household: order counts, total and average spend, and demographics. A probabilistic “Buy Till You Die” approach then produced the CLV forecast: a BG/NBD model for how often and how likely a household is to keep purchasing, combined with a Gamma-Gamma model for how much they spend per transaction, together giving a 12-month forward CLV for every household. Validated against a held-out period, predicted spend correlated with actual holdout spend at 0.797, a strong result for this type of forecast. The second question, whether Campaign 18 actually caused incremental spending, was tested with a Difference-in-Differences design: indexed spend for households that received Campaign 18 was compared against households that never received any campaign, before and after the campaign period. A first pass across all 1,133 households that received Campaign 18 showed a statistically significant lift of +$17.52 per household (p = 0.017), but many of those households had also been exposed to other, overlapping campaigns in the same window, so that lift couldn't be trusted as Campaign 18's alone. A robustness check isolated the 165 households that received Campaign 18 and nothing else, and re-ran the identical test on that clean group: the effect fell to −$1.87 and lost all significance (p = 0.896). The honest, contamination-free result is the one reported here: Campaign 18 shows no evidence of causing incremental spend, even though the naive first pass looked convincing.",
+
+      proofOfWork: {
+        heading: "Proof of Work",
+        intro: "The data layer behind the dashboard, straight from the query tool: real SQL that rolls two years of raw transactions into per-household summaries and an isolated, non-overlapping Campaign 18 test group.",
+        images: [
+          { src: "assets/clv_sql_customer_views.png", caption: "PostgreSQL views rolling up raw transaction and basket data into one row per household: order count, total and average spend." },
+          { src: "assets/clv_sql_customer_output.png", caption: "Output of the household summary view, joined against demographics for downstream modeling." },
+          { src: "assets/clv_sql_campaign_views.png", caption: "The views behind the causal test: tagging who did and didn't receive Campaign 18, then summing spend into a pre- and post-period window per household." },
+          { src: "assets/clv_sql_campaign_output.png", caption: "Household-level pre/post spend, treated vs. control, the exact table the Difference-in-Differences test runs on." }
+        ]
+      },
+
+      dashboardHeading: "Power BI dashboard: before vs. after removing contamination",
+      dashboardShots: [
+        { src: "assets/clv_dashboard_before.png", caption: "Before cleanup: all 1,133 households that received Campaign 18 vs. everyone who never received a campaign. Campaign 18 looks like it's winning." },
+        { src: "assets/clv_dashboard_after.png", caption: "After cleanup: isolated to the 165 households exposed to Campaign 18 and nothing else. The lines converge, the lift disappears, and the dashboard says so plainly." }
+      ],
+      dashboardCaption: "The dashboard itself toggles live between these two versions of the test, so a stakeholder can see the contamination problem and the honest result side by side, not just take the analyst's word for it.",
+
+      siteTables: [
+        {
+          badge: "CLV concentration",
+          heading: "Where the value actually sits",
+          headers: ["Tier", "Households", "Total 12-Month CLV", "% of Total CLV"],
+          rows: [
+            ["Top 20%", "500", "$2,185,670", "53.9%"],
+            ["Mid 30% (50th–80th pct)", "748", "$1,266,507", "31.3%"],
+            ["Bottom 50%", "1,249", "$600,621", "14.8%"]
+          ]
+        },
+        {
+          badge: "Campaign 18 · causal test",
+          heading: "Before vs. after removing contamination",
+          headers: ["Version of the test", "Households", "Effect / household", "Verdict"],
+          rows: [
+            ["Before cleanup (quick check)", "1,133", "+$17.52 (p = 0.017)", "Looks significant, but contaminated"],
+            ["After cleanup (Campaign 18 only)", "165", "−$1.87 (p = 0.896)", "Not significant — the honest result"]
+          ]
+        }
+      ],
+
+      dataSources: [
+        "dunnhumby “The Complete Journey” — 2 years of real household transaction, campaign and demographic data (2,500 households)",
+        "PostgreSQL data warehouse built directly from the raw dunnhumby CSV extracts",
+        "Power BI dashboard reading from the same household-level summary tables shown above"
+      ],
+
+      caseStudyHref: "assets/CLV_Campaign_Impact_Case_Study.docx",
+      extraDownloads: [
+        { href: "assets/CLV_PowerBI_Package.zip", label: "Power BI Package (.pbix + data)" }
+      ]
+    }
   },
   {
     title: "Inventory Policy Under Service-Level Targets",
