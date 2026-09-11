@@ -317,10 +317,197 @@ for p in range(0, 26):
   {
     title: "Credit Risk Pricing Model",
     tag: "Finance & Risk",
-    description: "Which loan applicants are likely to default, and how a lender should price that risk: a full statistical workup with a cost-minimizing decision threshold.",
-    image: "",
-    icon: "coin",
-    status: "soon"
+    description: "Which loan applicants are likely to become seriously delinquent, and how a lender should price that risk: two competing classifiers, a real calibration fix, and a cost-minimizing decision threshold with its own interactive calculator.",
+    image: "assets/project3-cover.png",
+    status: "live",
+
+    metrics: [
+      { value: 150, label: "thousand applicant records analyzed" },
+      { value: 87, label: "% ROC AUC, best model (gradient boosting)" },
+      { value: 73, label: "K saved per 10,000 applicants, best model vs. logistic regression" }
+    ],
+
+    skills: ["Python", "SQL", "Excel", "Azure", "Data Analysis", "Statistics", "Data Modeling"],
+
+    detail: {
+      tags: [
+        "Logistic Regression",
+        "Gradient Boosting (XGBoost)",
+        "Isotonic Probability Calibration",
+        "Cost-Minimizing Threshold Optimization",
+        "Python · scikit-learn · XGBoost",
+        "Azure SQL Database"
+      ],
+
+      methodSummary: "150,000 anonymized U.S. consumer credit records (“Give Me Some Credit,” a public Kaggle dataset) were cleaned (a data-entry error, three sentinel/placeholder codes standing in for real counts, ~20% missing income, and extreme outliers, all documented and flagged rather than silently dropped) down to 149,999 usable rows, loaded into an Azure SQL Database, and split 70/30 into train and test sets. Two classifiers were trained to predict serious delinquency within two years: logistic regression, chosen for its transparency, and gradient boosting (XGBoost), chosen for likely stronger discrimination. Gradient boosting did win on both ROC AUC (0.868 vs. 0.853) and PR AUC (0.404 vs. 0.382, the more informative metric given how imbalanced this target is), but its raw predicted probabilities were overconfident, a known GBM issue. Platt/sigmoid scaling made that worse; isotonic regression fixed it cleanly with no loss of discrimination, so the isotonic-calibrated version is what every downstream number here is built on. A predicted probability still isn't a decision, so the next step turned it into one: scanning every possible approve/decline cutoff against an explicitly assumed cost structure ($5,000 average credit exposure, 60% loss given default, 5% net interest margin, a ~12:1 cost ratio between missing a bad loan and turning away a good applicant) to find the cutoff that minimizes total expected cost. That gradient boosting cutoff (8.2% predicted risk) also anchors a three-tier risk-adjusted pricing framework built out in Excel. Every dollar figure here is explicitly “under these assumed costs,” never presented as ground truth, since the dataset itself has no loan amount, interest rate, or recovery data; and because age is one of the model's two strongest predictors, any real deployment would need an explainability layer (SHAP) plus bias/disparate-impact testing under ECOA and Regulation B before it could be trusted with real lending decisions.",
+
+      codeWalkthrough: [
+        {
+          title: "Load the cleaned data and hold out a real test set",
+          note: "A stratified 70/30 split keeps the ~6.7% delinquency rate consistent between train and test, and the test set stays completely untouched until final evaluation.",
+          code: `TARGET = "SeriousDlqin2yrs"
+ID_COL = "id"
+RANDOM_STATE = 42
+
+df = pd.read_csv(DATA_PATH)
+feature_cols = [c for c in df.columns if c not in (ID_COL, TARGET)]
+X = df[feature_cols]
+y = df[TARGET].astype(int)
+
+print(f"Rows: {len(df)}, features: {len(feature_cols)}, "
+      f"delinquency rate: {y.mean()*100:.2f}%")
+
+# Stratified 70/30 split - test set is held out untouched until final eval
+X_train, X_test, y_train, y_test, id_train, id_test = train_test_split(
+    X, y, df[ID_COL], test_size=0.30, stratify=y, random_state=RANDOM_STATE
+)
+print(f"Train: {len(X_train)} rows, Test: {len(X_test)} rows")`
+        },
+        {
+          title: "Train both models",
+          note: "Logistic regression for a transparent baseline, gradient boosting (XGBoost) for likely stronger discrimination. Evaluated on ROC AUC, PR AUC (imbalance-aware), Brier score and the confusion matrix, never plain accuracy (a dumb “always predict no-delinquency” model would already score ~93%).",
+          code: `logreg = Pipeline([
+    ("scaler", StandardScaler()),
+    ("clf", LogisticRegression(max_iter=2000, random_state=RANDOM_STATE)),
+])
+logreg.fit(X_train, y_train)
+prob_logreg = logreg.predict_proba(X_test)[:, 1]
+evaluate("logistic_regression", y_test, prob_logreg)
+
+gbm = XGBClassifier(
+    n_estimators=300,
+    max_depth=4,
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    eval_metric="logloss",
+    random_state=RANDOM_STATE,
+    n_jobs=-1,
+)
+gbm.fit(X_train, y_train)
+prob_gbm_raw = gbm.predict_proba(X_test)[:, 1]
+evaluate("gradient_boosting_raw", y_test, prob_gbm_raw)`
+        },
+        {
+          title: "Fix the gradient boosting model's overconfidence",
+          note: "GBMs tend to push predicted probabilities toward 0 and 1 more than the data supports. Sigmoid/Platt scaling actually made the Brier score worse (0.0487 → 0.0504); isotonic regression, with 105k training rows to safely support its flexibility, fixed it cleanly (0.0486) with no loss of discrimination. That isotonic version is carried forward into every result below.",
+          code: `gbm_sigmoid = CalibratedClassifierCV(gbm_base_sig, method="sigmoid", cv=5)
+gbm_sigmoid.fit(X_train, y_train)
+prob_gbm_sigmoid = gbm_sigmoid.predict_proba(X_test)[:, 1]
+evaluate("gradient_boosting_calibrated_sigmoid", y_test, prob_gbm_sigmoid)
+
+gbm_isotonic = CalibratedClassifierCV(gbm_base_iso, method="isotonic", cv=5)
+gbm_isotonic.fit(X_train, y_train)
+prob_gbm_iso = gbm_isotonic.predict_proba(X_test)[:, 1]
+evaluate("gradient_boosting_calibrated_isotonic", y_test, prob_gbm_iso)
+
+# Isotonic wins on calibration reliability with no loss in discrimination -
+# this is the version carried forward into the threshold/cost analysis.
+test_preds["prob_gbm_final"] = prob_gbm_iso`
+        },
+        {
+          title: "Scan every cutoff for the one that minimizes cost",
+          note: "Every distinct predicted probability in the test set becomes a candidate decision threshold. At each one, count the false negatives (approved but actually delinquent) and false positives (declined but actually fine), weight them by the assumed per-mistake cost, and keep the cutoff with the lowest total.",
+          code: `COST_FALSE_NEGATIVE = 3000  # approved a would-be-delinquent applicant
+COST_FALSE_POSITIVE = 250   # declined an applicant who would've paid fine
+
+def cost_curve(y_true, y_prob):
+    order = np.argsort(y_prob)  # ascending: lowest risk first
+    y_sorted = y_true.values[order]
+    p_sorted = y_prob.values[order]
+
+    cum_y = np.concatenate([[0], np.cumsum(y_sorted)])
+    total_pos = cum_y[-1]
+    total_n = len(y_sorted)
+
+    k = np.arange(total_n + 1)          # applicants approved (lowest-risk k)
+    fn = cum_y                          # approved but actually delinquent
+    declined = total_n - k
+    fp = declined - (total_pos - fn)    # declined but actually fine
+
+    total_cost = fn * COST_FALSE_NEGATIVE + fp * COST_FALSE_POSITIVE
+    cost_per_10k = total_cost / total_n * 10000
+    return pd.DataFrame({"threshold": np.concatenate([[0.0], p_sorted]),
+                          "false_negatives": fn, "false_positives": fp,
+                          "cost_per_10k_applicants": cost_per_10k})
+
+best_idx = curve["cost_per_10k_applicants"].idxmin()
+best_row = curve.loc[best_idx]`
+        }
+      ],
+
+      proofOfWork: {
+        heading: "Proof of Work: Azure SQL",
+        intro: "Three analytical queries run directly against the live Azure SQL database (dbo.credit_applicants, 149,999 rows), independently verifying the Excel EDA findings from inside the database rather than just table-create-and-load.",
+        steps: [
+          {
+            title: "Delinquency rate by revolving utilization band",
+            note: "149,999 rows, 6.68% overall delinquency. Under 10% utilization: 1.81%. 10–50%: 4.11%. 50–100%: 15.28%. Over 100%: 37.18%, almost exactly matching the Excel EDA's ~1.8% / ~37.2% finding.",
+            code: { src: "assets/credit_sql_utilization_query.png", caption: "The SQL: delinquency rate grouped by revolving utilization band." },
+            result: { src: "assets/credit_sql_utilization_output.png", caption: "The result: a clean, sharply increasing default gradient by utilization band." }
+          },
+          {
+            title: "Delinquency rate by age band",
+            note: "A clean, monotonic trend: Under 30 = 11.73%, 30–39 = 10.07%, 40–49 = 8.37%, 50–59 = 6.45%, 60–69 = 3.63%, 70+ = 2.32%.",
+            code: { src: "assets/credit_sql_age_query.png", caption: "The SQL: delinquency rate grouped by age band." },
+            result: { src: "assets/credit_sql_age_output.png", caption: "The result: risk falls steadily with age, consistent across every band." }
+          },
+          {
+            title: "Data-quality flag check",
+            note: "Verifying the cleaning flags survived the load: IncomeNotReported = 29,731 (19.82%, matches the ~20% documented during cleaning), SentinelCode = 269 (0.18%), DebtRatioCapped and RevUtilCapped = 1,500 each (both ~1%, matching the 99th-percentile winsorization).",
+            code: { src: "assets/credit_sql_quality_query.png", caption: "The SQL: counting each cleaning flag directly from the loaded table." },
+            result: { src: "assets/credit_sql_quality_output.png", caption: "The result: every flag count lines up with what the cleaning step documented." }
+          }
+        ]
+      },
+
+      chartImage: "assets/chart_cost_vs_threshold.png",
+      chartHeading: "Cost per 10,000 applicants vs. decision threshold",
+      chartCaption: "Gradient boosting's cost curve sits below logistic regression's across nearly the whole range, and its minimum is both lower and reached at a higher, more generous approval rate. The interactive version below lets you change the underlying cost assumptions and see both curves, and both optimal cutoffs, move in real time.",
+
+      dashboardHeading: "Model Evaluation & Pricing Tier Validation",
+      dashboardShots: [
+        { src: "assets/chart_roc_comparison.png", caption: "ROC curves on the held-out test set: gradient boosting reaches 0.868 ROC AUC vs. 0.853 for logistic regression, a real but modest edge given how imbalanced this target is." },
+        { src: "assets/chart_calibration_reliability.png", caption: "Reliability curve after isotonic calibration: predicted probabilities now track observed delinquency rates closely, the fix described in the code walkthrough above." },
+        { src: "assets/chart_default_rate_by_tier.png", caption: "Actual test-set delinquency rate inside each pricing tier: 1.1% Low, 4.9% Moderate, 24.0% Decline, confirming the tier boundaries genuinely separate risk rather than being an arbitrary cutoff." }
+      ],
+
+      toolHref: "assets/credit_threshold_calculator.html",
+      toolHeading: "Interactive Cost-Minimizing Threshold Calculator",
+
+      siteTables: [
+        {
+          badge: "Under assumed costs: $5,000 exposure · 60% LGD · 5% NIM",
+          heading: "Cost-minimizing cutoff, both models",
+          headers: ["Model", "Optimal cutoff", "Approval rate", "Mistakes (FN / FP)", "Cost / 10,000 applicants"],
+          rows: [
+            ["Logistic Regression", "7.1%", "76.7%", "773 / 8,267", "$974,611"],
+            ["Gradient Boosting", "8.2%", "79.1%", "757 / 7,153", "$902,056"]
+          ]
+        },
+        {
+          badge: "Sample Applicant Pricing workbook (VLOOKUP)",
+          heading: "Risk-adjusted pricing tiers",
+          headers: ["Tier", "Predicted risk band", "Actual delinquency rate", "Rate offered"],
+          rows: [
+            ["Low risk", "Below 3%", "1.1%", "12.9% APR"],
+            ["Moderate risk", "3% – 8.2%", "4.9%", "19.9% APR"],
+            ["Decline", "Above 8.2%", "24.0%", "N/A"]
+          ]
+        }
+      ],
+
+      dataSources: [
+        "“Give Me Some Credit” (Kaggle, public dataset): 150,000 anonymized U.S. consumer credit records, target = serious delinquency (90+ days past due) within 2 years",
+        "Azure SQL Database (dbo.credit_applicants, 149,999 rows loaded via Python/pyodbc): 3 analytical SQL queries run directly against the live database, independently verifying the Excel EDA findings",
+        "Excel EDA workbook (COUNTIFS / AVERAGEIFS breakdowns by age, income, utilization and late-payment bands), built and owned by the author, cited directly in the case study"
+      ],
+
+      caseStudyHref: "assets/Credit_Risk_Pricing_Case_Study.docx",
+      extraDownloads: [
+        { href: "assets/Credit_Risk_Pricing_Framework.xlsx", label: "Pricing Framework Workbook (.xlsx)" }
+      ]
+    }
   },
   {
     title: "Employee Tenure & Turnover Cost",

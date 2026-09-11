@@ -425,6 +425,7 @@ function liveModalHTML(p) {
   if (d.caseStudyHref) downloads.push(`<a class="dl-primary" href="${d.caseStudyHref}" download>${DOWNLOAD_ICON} Download Case Study (.docx)</a>`);
   if (d.notebookHref) downloads.push(`<a class="dl-secondary" href="${d.notebookHref}" download>${DOWNLOAD_ICON} Notebook (.ipynb)</a>`);
   if (d.mapHref) downloads.push(`<a class="dl-secondary" href="${d.mapHref}" target="_blank" rel="noopener">Open Map Full Screen &#8599;</a>`);
+  if (d.toolHref) downloads.push(`<a class="dl-secondary" href="${d.toolHref}" target="_blank" rel="noopener">Open Calculator Full Screen &#8599;</a>`);
   // Any other downloadable package a project wants to offer (e.g. a Power BI
   // .pbix file bundled with its source data). Each entry: { href, label }.
   (d.extraDownloads || []).forEach(x => {
@@ -448,7 +449,7 @@ function liveModalHTML(p) {
 
   // --- Outcome: the visual result first (charts / dashboard screenshots),
   // then the interactive map, ahead of any code -----------------------
-  if (d.chartImage || (d.dashboardShots && d.dashboardShots.length) || d.mapHref) {
+  if (d.chartImage || (d.dashboardShots && d.dashboardShots.length) || d.mapHref || d.toolHref) {
     const legend = (d.legend || []).map(l =>
       `<span><span class="dot" style="background:${l.color};${l.square ? 'border-radius:2px;' : ''}"></span>${l.label}</span>`
     ).join('');
@@ -476,7 +477,17 @@ function liveModalHTML(p) {
         ${legend ? `<div class="modal-legend">${legend}</div>` : ''}
       </div>
     ` : '';
-    parts.push(`<section class="modal-section"><h3>Outcome</h3>${chartBlock}${dashboardBlock}${mapBlock}</section>`);
+    // Same idea as the interactive map, but for a live tool (e.g. a
+    // what-if calculator) instead of a Folium map, so it gets its own
+    // taller iframe class (.modal-tool) rather than reusing .modal-map's
+    // fixed map-sized height.
+    const toolBlock = d.toolHref ? `
+      <div class="outcome-block">
+        <h4>${d.toolHeading || 'Interactive tool'}</h4>
+        <iframe class="modal-tool" src="${d.toolHref}" loading="lazy"></iframe>
+      </div>
+    ` : '';
+    parts.push(`<section class="modal-section"><h3>Outcome</h3>${chartBlock}${dashboardBlock}${mapBlock}${toolBlock}</section>`);
   }
 
   // --- Methodology (tools/techniques used, then the real code, then any

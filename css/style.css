@@ -572,6 +572,12 @@ footer.in-view { opacity: 1; }
 .modal-map {
   width: 100%; height: 440px; border: 1px solid var(--border); border-radius: 12px;
 }
+/* Taller than .modal-map on purpose: this embeds a full interactive tool
+   (sliders + result cards + chart), not a plain map, so it needs more
+   vertical room to avoid an inner scrollbar on top of the modal's own. */
+.modal-tool {
+  width: 100%; height: 740px; border: 1px solid var(--border); border-radius: 12px;
+}
 .modal-legend {
   display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px;
   font-size: 12px; color: var(--text-muted);
@@ -652,6 +658,7 @@ footer.in-view { opacity: 1; }
   .stats-strip { gap: 28px; }
   .modal-panel { padding: 42px 22px 34px; }
   .modal-map { height: 300px; }
+  .modal-tool { height: 960px; }
   .stack-shot img { max-height: 340px; }
   .code-step { padding: 14px 14px 16px; }
   .code-block { font-size: 11.5px; }
